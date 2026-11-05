@@ -1,0 +1,3 @@
+The evaluation of a retrieval system is done by comparing the retrieved documents with a list of relevant documents.
+Precision is the fraction of retrieved documents that are relevant, while recall is the fraction of relevant documents that were retrieved.
+A good system should have both high precision and high recall, but in practice there is often a trade-off between them!

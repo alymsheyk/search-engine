@@ -1,0 +1,3 @@
+An inverted file is a data structure that maps each term to the list of documents in which it appears.
+It is the core of almost every modern search engine, because it allows the system to answer queries very quickly.
+Each entry in the inverted file can also store a weight, for example TF-IDF, which shows how important the term is in a document.
