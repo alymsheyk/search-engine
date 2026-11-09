@@ -324,3 +324,132 @@ if __name__ == "__main__":
     process_collection(INPUT_DIR, OUTPUT_DIR)
     print("-" * 50)
     print(f"Done. Results saved in '{OUTPUT_DIR}/'")
+    """
+Project 3 - Inverted file
+Builds a weighted inverted file (TF-IDF) from the stemmed documents.
+Input : output/*.sfx (text documents without suffixes, from Project 2)
+Output: output/inverted_file.csv  -> the matrix (terms x documents), opens in Excel
+        output/inverted_file.txt  -> the postings lists (term -> documents + weights)
+        output/inverted_file.json -> the same data, ready to be loaded by Project 4
+"""
+ 
+import os
+import math
+import json
+import csv
+ 
+INPUT_DIR = "output"
+OUTPUT_DIR = "output"
+ 
+ 
+# ---------- Step 1: read the documents ----------
+def read_documents(input_dir):
+    """Return {doc_id: [terms]} for every .sfx file, e.g. {"doc1": ["retriev", ...]}"""
+    documents = {}
+    for filename in sorted(os.listdir(input_dir)):
+        if filename.endswith(".sfx"):
+            doc_id = os.path.splitext(filename)[0]          # doc1.sfx -> doc1
+            with open(os.path.join(input_dir, filename), "r", encoding="utf-8") as f:
+                documents[doc_id] = f.read().split()
+    return documents
+ 
+ 
+# ---------- Step 2: build the vocabulary ----------
+def build_vocabulary(documents):
+    """All distinct terms in the collection, sorted alphabetically."""
+    vocabulary = set()
+    for terms in documents.values():
+        vocabulary.update(terms)
+    return sorted(vocabulary)
+ 
+ 
+# ---------- Step 3: term frequency (tf) ----------
+def term_frequencies(documents):
+    """Return {doc_id: {term: count}}"""
+    tf = {}
+    for doc_id, terms in documents.items():
+        counts = {}
+        for term in terms:
+            counts[term] = counts.get(term, 0) + 1
+        tf[doc_id] = counts
+    return tf
+ 
+ 
+# ---------- Step 4: document frequency (df) ----------
+def document_frequencies(tf, vocabulary):
+    """Return {term: number of documents containing the term}"""
+    return {term: sum(1 for counts in tf.values() if term in counts)
+            for term in vocabulary}
+ 
+ 
+# ---------- Step 5: inverse document frequency (idf) ----------
+def inverse_document_frequencies(df, n_docs):
+    """idf = log10(N / df)"""
+    return {term: math.log10(n_docs / df[term]) for term in df}
+ 
+ 
+# ---------- Step 6 + 7: weights (tf x idf) and the inverted file ----------
+def build_inverted_file(tf, idf, vocabulary):
+    """Return {term: {doc_id: weight}} - only documents that contain the term."""
+    inverted = {}
+    for term in vocabulary:
+        postings = {}
+        for doc_id, counts in tf.items():
+            if term in counts:
+                postings[doc_id] = counts[term] * idf[term]
+        inverted[term] = postings
+    return inverted
+ 
+ 
+# ---------- Step 8: save the output ----------
+def save_matrix_csv(inverted, doc_ids, path):
+    """Full matrix: one row per term, one column per document."""
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["term"] + doc_ids)
+        for term, postings in inverted.items():
+            writer.writerow([term] + [round(postings.get(d, 0.0), 4) for d in doc_ids])
+ 
+ 
+def save_postings_txt(inverted, df, idf, path):
+    """Readable postings lists: term (df, idf) -> doc: weight, ..."""
+    with open(path, "w", encoding="utf-8") as f:
+        for term, postings in inverted.items():
+            plist = ", ".join(f"{d}: {w:.3f}" for d, w in postings.items())
+            f.write(f"{term:<12} df={df[term]}  idf={idf[term]:.3f}  ->  {plist}\n")
+ 
+ 
+def save_json(inverted, idf, doc_ids, path):
+    """Everything Project 4 needs to answer queries."""
+    data = {"documents": doc_ids, "idf": idf, "inverted_file": inverted}
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+ 
+ 
+if __name__ == "__main__":
+    documents = read_documents(INPUT_DIR)
+    doc_ids = list(documents.keys())
+    n_docs = len(doc_ids)
+ 
+    vocabulary = build_vocabulary(documents)
+    tf = term_frequencies(documents)
+    df = document_frequencies(tf, vocabulary)
+    idf = inverse_document_frequencies(df, n_docs)
+    inverted = build_inverted_file(tf, idf, vocabulary)
+ 
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    save_matrix_csv(inverted, doc_ids, os.path.join(OUTPUT_DIR, "inverted_file.csv"))
+    save_postings_txt(inverted, df, idf, os.path.join(OUTPUT_DIR, "inverted_file.txt"))
+    save_json(inverted, idf, doc_ids, os.path.join(OUTPUT_DIR, "inverted_file.json"))
+ 
+    print("Inverted file (TF-IDF)")
+    print("-" * 50)
+    print("Documents :", n_docs, doc_ids)
+    print("Terms     :", len(vocabulary))
+    print("-" * 50)
+    for term in ["invert", "retriev", "document","fraction"]:          # quick check
+        if term in inverted:
+            plist = ", ".join(f"{d}: {w:.3f}" for d, w in inverted[term].items())
+            print(f"{term:<10} df={df[term]} idf={idf[term]:.3f} -> {plist}")
+    print("-" * 50)
+    print(f"Done. Saved inverted_file.csv / .txt / .json in '{OUTPUT_DIR}/'")
